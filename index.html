@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>한영 번역기 (Gemini)</title>
+
+    <!-- PWA & 모바일 설정 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="번역기">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#667eea">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%23667eea' width='100' height='100' rx='20'/><text x='50' y='65' font-size='45' text-anchor='middle'>🌐</text></svg>">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            padding-top: calc(20px + env(safe-area-inset-top));
+            padding-bottom: calc(20px + env(safe-area-inset-bottom));
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: white;
+            margin-bottom: 20px;
+            font-size: 2rem;
+        }
+
+        .api-key-section {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .api-key-section label {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .api-key-section input {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px 15px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .api-key-section input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .translator-box {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 15px;
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            align-items: center;
+        }
+
+        @media (max-width: 768px) {
+            .translator-box {
+                grid-template-columns: 1fr;
+            }
+            .swap-section {
+                order: -1;
+            }
+        }
+
+        .panel {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .panel-header h2 {
+            font-size: 1.1rem;
+            color: #333;
+        }
+
+        .panel-header span {
+            font-size: 0.85rem;
+            color: #888;
+        }
+
+        textarea {
+            width: 100%;
+            height: 300px;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            line-height: 1.6;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .input-textarea {
+            background: #fafafa;
+        }
+
+        .output-textarea {
+            background: #f0f4ff;
+        }
+
+        .swap-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .swap-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .swap-btn:hover {
+            transform: rotate(180deg);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .direction-label {
+            font-size: 0.8rem;
+            color: #666;
+            text-align: center;
+        }
+
+        .button-section {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.1rem;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .status.error {
+            color: #e74c3c;
+        }
+
+        .auto-translate {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: auto;
+        }
+
+        .auto-translate input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .auto-translate label {
+            font-size: 0.9rem;
+            color: #666;
+            cursor: pointer;
+        }
+
+        .lang-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 15px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .lang-badge.source {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .lang-badge.target {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .lang-badge.refine {
+            background: #fff3e0;
+            color: #e65100;
+        }
+
+        .speak-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: background 0.2s;
+        }
+
+        .speak-btn:hover {
+            background: #43A047;
+        }
+
+        .speak-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .speak-btn.speaking {
+            background: #f44336;
+        }
+
+        .output-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .output-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .clear-btn {
+            background: #9e9e9e;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: background 0.2s;
+        }
+
+        .clear-btn:hover {
+            background: #757575;
+        }
+
+        .mic-btn {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: background 0.2s;
+        }
+
+        .mic-btn:hover {
+            background: #1976D2;
+        }
+
+        .mic-btn.recording {
+            background: #f44336;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        .input-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .input-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* 모바일 반응형 */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            .translator-box {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+
+            .swap-section {
+                order: -1;
+                flex-direction: row;
+                padding: 10px 0;
+            }
+
+            .swap-btn {
+                width: 40px;
+                height: 40px;
+                font-size: 1.2rem;
+            }
+
+            textarea {
+                height: 200px;
+                font-size: 14px;
+            }
+
+            .api-key-section {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .api-key-section input {
+                width: 100%;
+            }
+
+            .auto-translate {
+                margin-left: 0;
+                justify-content: center;
+            }
+
+            .input-header, .output-header {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .input-controls, .output-controls {
+                flex-wrap: wrap;
+                justify-content: flex-end;
+            }
+
+            .mic-btn, .clear-btn, .speak-btn {
+                padding: 6px 12px;
+                font-size: 0.85rem;
+            }
+
+            button {
+                padding: 12px 30px;
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>한영 번역기 (Gemini)</h1>
+
+        <div class="api-key-section">
+            <label for="apiKey">API Key:</label>
+            <input type="password" id="apiKey" placeholder="Gemini API 키를 입력하세요">
+            <div class="auto-translate">
+                <input type="checkbox" id="autoTranslate">
+                <label for="autoTranslate">자동 번역</label>
+            </div>
+        </div>
+
+        <div class="translator-box">
+            <div class="panel" id="leftPanel">
+                <div class="panel-header input-header">
+                    <h2 id="leftLang">한국어 <span class="lang-badge source">입력</span></h2>
+                    <div class="input-controls">
+                        <span id="leftCharCount">0자</span>
+                        <button class="clear-btn" id="clearBtn" title="입력 지우기">
+                            ✕ 지우기
+                        </button>
+                        <button class="mic-btn" id="micBtn" title="음성 입력">
+                            🎤 음성
+                        </button>
+                    </div>
+                </div>
+                <textarea
+                    class="input-textarea"
+                    id="leftText"
+                    placeholder="번역할 텍스트를 입력하세요..."
+                ></textarea>
+            </div>
+
+            <div class="swap-section">
+                <button class="swap-btn" id="swapBtn" title="언어 방향 전환">⇄</button>
+                <div class="direction-label" id="directionLabel">한 → 영</div>
+            </div>
+
+            <div class="panel" id="rightPanel">
+                <div class="panel-header output-header">
+                    <h2 id="rightLang">English <span class="lang-badge target">결과</span></h2>
+                    <div class="output-controls">
+                        <span id="translateStatus"></span>
+                        <button class="speak-btn" id="speakBtn" title="영어로 읽기">
+                            🔊 읽기
+                        </button>
+                    </div>
+                </div>
+                <textarea
+                    class="output-textarea"
+                    id="rightText"
+                    placeholder="번역 결과가 여기에 표시됩니다..."
+                    readonly
+                ></textarea>
+            </div>
+        </div>
+
+        <div class="button-section">
+            <button id="translateBtn">번역하기</button>
+        </div>
+        <div class="status" id="status"></div>
+    </div>
+
+    <script>
+        const apiKeyInput = document.getElementById('apiKey');
+        const leftText = document.getElementById('leftText');
+        const rightText = document.getElementById('rightText');
+        const translateBtn = document.getElementById('translateBtn');
+        const leftCharCount = document.getElementById('leftCharCount');
+        const status = document.getElementById('status');
+        const autoTranslate = document.getElementById('autoTranslate');
+        const translateStatus = document.getElementById('translateStatus');
+        const swapBtn = document.getElementById('swapBtn');
+        const leftLang = document.getElementById('leftLang');
+        const rightLang = document.getElementById('rightLang');
+        const directionLabel = document.getElementById('directionLabel');
+        const speakBtn = document.getElementById('speakBtn');
+        const micBtn = document.getElementById('micBtn');
+        const clearBtn = document.getElementById('clearBtn');
+
+        // 음성 합성
+        let isSpeaking = false;
+
+        // 음성 인식
+        let isRecording = false;
+        let recognition = null;
+        let voicePauseTimer = null;
+
+        // 음성 인식 초기화
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+
+            recognition.onresult = (event) => {
+                let finalTranscript = '';
+                let interimTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript;
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
+
+                if (finalTranscript) {
+                    leftText.value += finalTranscript;
+                    leftCharCount.textContent = `${leftText.value.length}자`;
+
+                    // Reset 5-second pause timer
+                    clearTimeout(voicePauseTimer);
+                    voicePauseTimer = setTimeout(() => {
+                        if (isRecording && leftText.value.trim()) {
+                            stopRecording();
+                            showStatus('5초 대기 후 자동 번역 시작...');
+                            translate();
+                        }
+                    }, 5000);
+                }
+            };
+
+            recognition.onend = () => {
+                if (isRecording) {
+                    // 자동으로 다시 시작 (continuous 모드)
+                    recognition.start();
+                }
+            };
+
+            recognition.onerror = (event) => {
+                console.error('Speech recognition error:', event.error);
+                stopRecording();
+                if (event.error === 'not-allowed') {
+                    showStatus('마이크 권한이 필요합니다.', true);
+                } else {
+                    showStatus('음성 인식 오류: ' + event.error, true);
+                }
+            };
+        }
+
+        function startRecording() {
+            if (!recognition) {
+                showStatus('이 브라우저는 음성 인식을 지원하지 않습니다.', true);
+                return;
+            }
+
+            // 언어 설정
+            if (translateMode === 'ko-en') {
+                recognition.lang = 'ko-KR';
+            } else {
+                recognition.lang = 'en-US';
+            }
+
+            isRecording = true;
+            micBtn.innerHTML = '⏹ 중지';
+            micBtn.classList.add('recording');
+            recognition.start();
+            showStatus('음성 인식 중... 말씀하세요.');
+        }
+
+        function stopRecording() {
+            isRecording = false;
+            micBtn.innerHTML = '🎤 음성';
+            micBtn.classList.remove('recording');
+            clearTimeout(voicePauseTimer);
+            if (recognition) {
+                recognition.stop();
+            }
+            showStatus('음성 인식 종료');
+        }
+
+        micBtn.addEventListener('click', () => {
+            if (isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        });
+
+        // 입력 지우기 버튼
+        clearBtn.addEventListener('click', () => {
+            leftText.value = '';
+            rightText.value = '';
+            leftCharCount.textContent = '0자';
+            translateStatus.textContent = '';
+            showStatus('입력이 지워졌습니다.');
+        });
+
+        // 번역 모드: 'ko-en' = 한→영, 'en-ko' = 영→한, 'en-refine' = 영어 다듬기
+        let translateMode = 'ko-en';
+
+        // 저장된 API 키 불러오기
+        const savedApiKey = localStorage.getItem('gemini_api_key');
+        if (savedApiKey) {
+            apiKeyInput.value = savedApiKey;
+        }
+
+        // API 키 저장
+        apiKeyInput.addEventListener('change', () => {
+            localStorage.setItem('gemini_api_key', apiKeyInput.value);
+        });
+
+        // 글자 수 업데이트
+        leftText.addEventListener('input', () => {
+            leftCharCount.textContent = `${leftText.value.length}자`;
+
+            // 자동 번역
+            if (autoTranslate.checked && leftText.value.trim()) {
+                debounceTranslate();
+            }
+        });
+
+        // 디바운스 함수
+        let debounceTimer;
+        function debounceTranslate() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(translate, 1000);
+        }
+
+        // 모드 전환 버튼
+        swapBtn.addEventListener('click', () => {
+            // 3개 모드 순환: ko-en → en-ko → en-refine → ko-en
+            if (translateMode === 'ko-en') {
+                translateMode = 'en-ko';
+            } else if (translateMode === 'en-ko') {
+                translateMode = 'en-refine';
+            } else {
+                translateMode = 'ko-en';
+            }
+            updateLanguageLabels();
+
+            // 모드 변경 시 결과창 초기화
+            rightText.value = '';
+            leftCharCount.textContent = `${leftText.value.length}자`;
+        });
+
+        function updateLanguageLabels() {
+            if (translateMode === 'ko-en') {
+                leftLang.innerHTML = '한국어 <span class="lang-badge source">입력</span>';
+                rightLang.innerHTML = 'English <span class="lang-badge target">결과</span>';
+                directionLabel.textContent = '한 → 영';
+                leftText.placeholder = '번역할 한국어 텍스트를 입력하세요...';
+                rightText.placeholder = '영어 번역 결과가 여기에 표시됩니다...';
+            } else if (translateMode === 'en-ko') {
+                leftLang.innerHTML = 'English <span class="lang-badge source">입력</span>';
+                rightLang.innerHTML = '한국어 <span class="lang-badge target">결과</span>';
+                directionLabel.textContent = '영 → 한';
+                leftText.placeholder = 'Enter English text to translate...';
+                rightText.placeholder = '한국어 번역 결과가 여기에 표시됩니다...';
+            } else {
+                leftLang.innerHTML = 'English <span class="lang-badge source">입력</span>';
+                rightLang.innerHTML = 'English <span class="lang-badge refine">다듬기</span>';
+                directionLabel.textContent = '영 → 영 (다듬기)';
+                leftText.placeholder = 'Enter English text to refine...';
+                rightText.placeholder = 'Refined English will appear here...';
+            }
+        }
+
+        // 번역 버튼 클릭
+        translateBtn.addEventListener('click', translate);
+
+        // Enter + Ctrl로 번역
+        leftText.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') {
+                translate();
+            }
+        });
+
+        async function translate() {
+            const apiKey = apiKeyInput.value.trim();
+            const text = leftText.value.trim();
+
+            if (!apiKey) {
+                showStatus('API 키를 입력해주세요.', true);
+                return;
+            }
+
+            if (!text) {
+                showStatus('번역할 텍스트를 입력해주세요.', true);
+                return;
+            }
+
+            translateBtn.disabled = true;
+            swapBtn.disabled = true;
+            translateStatus.textContent = '번역 중...';
+            showStatus('Gemini API 호출 중...');
+
+            let prompt;
+            if (translateMode === 'ko-en') {
+                prompt = `Translate the following Korean text to English. Only provide the translation, no explanations:\n\n${text}`;
+            } else if (translateMode === 'en-ko') {
+                prompt = `Translate the following English text to Korean. Only provide the translation, no explanations:\n\n${text}`;
+            } else {
+                prompt = `Refine and improve the following English text to make it more polished, professional, and natural-sounding. Fix any grammar issues and improve word choices. Only provide the refined text, no explanations:\n\n${text}`;
+            }
+
+            try {
+                const response = await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            contents: [{
+                                parts: [{
+                                    text: prompt
+                                }]
+                            }]
+                        })
+                    }
+                );
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error?.message || '번역 요청 실패');
+                }
+
+                const data = await response.json();
+                const translation = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                if (translation) {
+                    rightText.value = translation;
+                    translateStatus.textContent = '완료';
+                    showStatus('번역 완료!');
+                } else {
+                    throw new Error('번역 결과를 받지 못했습니다.');
+                }
+            } catch (error) {
+                showStatus(`오류: ${error.message}`, true);
+                translateStatus.textContent = '오류';
+            } finally {
+                translateBtn.disabled = false;
+                swapBtn.disabled = false;
+            }
+        }
+
+        function showStatus(message, isError = false) {
+            status.textContent = message;
+            status.className = isError ? 'status error' : 'status';
+
+            if (!isError) {
+                setTimeout(() => {
+                    status.textContent = '';
+                }, 3000);
+            }
+        }
+
+        // 음성 읽기 기능
+        speakBtn.addEventListener('click', () => {
+            if (isSpeaking) {
+                // 읽기 중지
+                speechSynthesis.cancel();
+                isSpeaking = false;
+                speakBtn.innerHTML = '🔊 읽기';
+                speakBtn.classList.remove('speaking');
+                return;
+            }
+
+            const text = rightText.value.trim();
+            if (!text) {
+                showStatus('읽을 텍스트가 없습니다.', true);
+                return;
+            }
+
+            // 영어 음성 선택
+            const utterance = new SpeechSynthesisUtterance(text);
+
+            // 영어 음성 찾기
+            const voices = speechSynthesis.getVoices();
+            const englishVoice = voices.find(voice =>
+                voice.lang.startsWith('en-') && voice.name.includes('Google')
+            ) || voices.find(voice => voice.lang.startsWith('en-'));
+
+            if (englishVoice) {
+                utterance.voice = englishVoice;
+            }
+            utterance.lang = 'en-US';
+            utterance.rate = 0.9;
+
+            utterance.onstart = () => {
+                isSpeaking = true;
+                speakBtn.innerHTML = '⏹ 중지';
+                speakBtn.classList.add('speaking');
+            };
+
+            utterance.onend = () => {
+                isSpeaking = false;
+                speakBtn.innerHTML = '🔊 읽기';
+                speakBtn.classList.remove('speaking');
+            };
+
+            utterance.onerror = () => {
+                isSpeaking = false;
+                speakBtn.innerHTML = '🔊 읽기';
+                speakBtn.classList.remove('speaking');
+                showStatus('음성 읽기 오류가 발생했습니다.', true);
+            };
+
+            speechSynthesis.speak(utterance);
+        });
+
+        // 음성 목록 로드 (일부 브라우저에서 필요)
+        speechSynthesis.onvoiceschanged = () => {
+            speechSynthesis.getVoices();
+        };
+    </script>
+</body>
+</html>
